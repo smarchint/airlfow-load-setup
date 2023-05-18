@@ -1,0 +1,116 @@
+scheduler:
+  replicas: 1
+  resources:
+    requests:
+      cpu: 2
+      memory: 2G
+  extraVolumeMounts:
+    - name: daggen-script
+      mountPath: /daggen.py
+      subPath: daggen.py
+  extraVolumes:
+    - name: daggen-script
+      configMap:
+        name: daggen-script
+  args: ["bash", "-c", "python /daggen.py && exec airflow scheduler"]
+  livenessProbe:
+    command: ["bash", "-c", "airflow jobs check --job-type SchedulerJob --allow-multiple --limit 100"]
+    initialDelaySeconds: 10
+    timeoutSeconds: 60
+
+workers:
+  replicas: 0
+  persistence:
+    enabled: false
+  extraVolumeMounts:
+    - name: daggen-script
+      mountPath: /daggen.py
+      subPath: daggen.py
+  extraVolumes:
+    - name: daggen-script
+      configMap:
+        name: daggen-script
+  args:
+    - "bash"
+    - "-c"
+    - |-
+      python /daggen.py && \
+      exec \
+      airflow {{ semverCompare ">=2.0.0" .Values.airflowVersion | ternary "celery worker" "worker" }}
+  resources:
+    requests:
+      cpu: 2
+      memory: 4G
+
+ingress:
+  enabled: false
+
+# extraEnv: |
+#   - name: AIRFLOW__WEBSERVER__WORKER_CLASS
+#     value: 'gevent'
+
+config:
+  api:
+    auth_backend:  airflow.api.auth.backend.basic_auth
+  core:
+    parallelism: 1000
+    dags_folder: /opt/airflow/dags
+    dagbag_import_timeout: 200
+    dag_file_processor_timeout: 300
+    min_serialized_dag_fetch_interval: 600
+    min_serialized_dag_update_interval: 1200
+    donot_pickle: true
+  celery: 
+    worker_concurrency: 100
+  scheduler:
+    max_dagruns_per_loop_to_schedule: 200
+    max_dagruns_to_create_per_loop: 500
+    min_file_process_interval: 300
+    dag_dir_list_interval: 300
+    catchup_by_default: false
+    processor_poll_interval: 10
+    parsing_processes: 5
+  webserver:  
+    expose_config: 'True'
+    worker_class: gevent
+  operators:
+    default_cpus: 1
+    default_ram: 512
+  logging:
+    logging_level: 'DEBUG'
+    
+
+
+uid: 1000
+
+# executor: "LocalExecutor"
+executor: "CeleryExecutor"
+airflowVersion: "2.1.4"
+defaultAirflowTag: "2.1.4"
+
+data:
+  brokerUrl: redis://:test123@airflow-redis:6379/0
+#   metadataConnection:
+#     user: postgres
+#     pass: airflow
+#     protocol: postgresql
+#     host: 10.50.0.3
+#     port: 5432
+#     db: postgres
+#     sslmode: disable
+
+flower:
+  enabled: false
+
+statsd:
+  enabled: false
+
+redis:
+  enabled: true
+
+logs:
+  persistence:
+    enabled: false
+
+postgresql:
+  enabled: true

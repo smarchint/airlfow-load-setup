@@ -1,0 +1,33 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: daggen-script
+data:
+  daggen.py: |
+    import os
+    os.makedirs("/opt/airflow/dags/", exist_ok=True)
+
+    NO_OF_DAGS = 100 #4000
+    SCHEDULE_INTERVAL = '*/5 * * * *'
+
+    for n in range(1, NO_OF_DAGS + 1):
+        dag_id = "perf_test_{}".format(str(n))
+        # print (f"{dag_id}")
+        with open(f"/opt/airflow/dags/{dag_id}.py", "w") as f:
+            f.write(f"""
+    from pendulum import datetime
+    from airflow import DAG
+    from airflow.models import Variable
+    from airflow.operators.dummy import DummyOperator
+    from airflow.operators.bash import BashOperator
+    from airflow.sensors.bash import BashSensor
+
+    def create_dag(dag_id, schedule, default_args):
+        dag = DAG(dag_id, catchup=False, is_paused_upon_creation=True, schedule_interval=schedule, default_args=default_args)
+        with dag:
+            t0 = DummyOperator(task_id="dummyop")
+            # t1 = BashOperator(task_id="bashop", bash_command="sleep 1",)
+        return dag     
+    default_args = {{"owner": "airflow", "start_date": datetime(2021, 1, 1)}}
+    dag = create_dag( "{dag_id}", "{SCHEDULE_INTERVAL}", default_args)
+    """)
