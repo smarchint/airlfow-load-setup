@@ -1,0 +1,18 @@
+apiVersion: monitoring.coreos.com/v1
+kind: ServiceMonitor
+metadata:
+  name: airflow-mon
+  labels:
+    chart: kube-prometheus-stack-45.29.0
+    release: kps
+    app: airflow-mon
+spec:
+  selector:
+    matchLabels:
+      component: statsd
+      release: airflow
+  endpoints:
+    - port: statsd-scrape
+  namespaceSelector:
+    matchNames:
+    - test
